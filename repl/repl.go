@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io"
 	"monkey/lexer"
-	"monkey/token"
+	"monkey/parser"
 	"strings"
 )
 
@@ -27,10 +27,14 @@ func Start(in io.Reader, out io.Writer) {
 			return
 		default:
 			l := lexer.New(line)
+			p := parser.New(l)
 
-			for tok := l.NextToken(); tok.Type != token.EOF; tok = l.NextToken() {
-				fmt.Fprintf(out, "%+v\n", tok)
+			if res, err := p.ParseProgram(); err == nil {
+				io.WriteString(out, res.String())
+			} else {
+				io.WriteString(out, err.Error())
 			}
+			io.WriteString(out, "\n")
 		}
 	}
 }
