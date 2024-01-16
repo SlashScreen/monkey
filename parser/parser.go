@@ -7,6 +7,18 @@ import (
 	"monkey/token"
 )
 
+const (
+	_ int = iota
+	LOWEST
+	EQUALS      // ==
+	LESSGREATER // > <
+	SUM         // + -
+	PRODUCT     // / *
+	PREFIX      // -, !
+	SPECIAL     // %, bitwise
+	CALL        // foo(x)
+)
+
 // Error
 
 type ParseError struct {
@@ -21,16 +33,27 @@ func createParseError(message string, args ...any) *ParseError {
 	return &ParseError{msg: fmt.Sprintf(message, args...)}
 }
 
+// Parser Functions
+
+type (
+	prefixParseFn func() (ast.Expression, error)
+	infixParseFn  func(ast.Expression) (ast.Expression, error)
+)
+
 // Parser
 
 type Parser struct {
 	l         *lexer.Lexer
 	curToken  token.Token
 	peekToken token.Token
+
+	prefixParseFns map[token.TokenType]prefixParseFn
+	infixParseFns  map[token.TokenType]infixParseFn
 }
 
 func New(l *lexer.Lexer) *Parser {
-	p := &Parser{l: l}
+	p := &Parser{l: l, prefixParseFns: make(map[token.TokenType]prefixParseFn), infixParseFns: make(map[token.TokenType]infixParseFn)}
+	p.registerPrefix(token.IDENT, p.parseIdent)
 
 	// Set both tokens
 	p.nextToken()
@@ -70,7 +93,7 @@ func (p *Parser) parseStatement() (ast.Statement, error) {
 	case token.RETURN:
 		return p.parseReturnStatement()
 	default:
-		return nil, createParseError("Expected statement, got token %q", p.curToken.Type)
+		return p.parseExpressionStatement()
 	}
 }
 
@@ -87,7 +110,7 @@ func (p *Parser) parseLetStatement() (*ast.LetStatement, error) {
 		return nil, err
 	}
 
-	exp, experr := p.parseExpression()
+	exp, experr := p.parseExpression(LOWEST)
 
 	if experr != nil {
 		return nil, experr
@@ -103,7 +126,7 @@ func (p *Parser) parseReturnStatement() (*ast.ReturnStatement, error) {
 
 	p.nextToken()
 
-	exp, err := p.parseExpression()
+	exp, err := p.parseExpression(LOWEST)
 	if err != nil {
 		return nil, err
 	}
@@ -112,10 +135,36 @@ func (p *Parser) parseReturnStatement() (*ast.ReturnStatement, error) {
 	return stmt, nil
 }
 
+func (p *Parser) parseExpressionStatement() (*ast.ExpressionStatement, error) {
+	stmt := &ast.ExpressionStatement{Token: p.curToken}
+
+	exp, err := p.parseExpression(LOWEST)
+	if err != nil {
+		return nil, err
+	}
+	stmt.Expression = exp
+
+	if p.peekTokenIs(token.SEMICOLON) {
+		p.nextToken()
+	}
+
+	return stmt, nil
+}
+
 // Expressions
 
-func (p *Parser) parseExpression() (ast.Expression, error) {
-	return nil, createParseError("Unimplemented.")
+func (p *Parser) parseExpression(rank int) (ast.Expression, error) {
+	prefix := p.prefixParseFns[p.curToken.Type]
+
+	if prefix == nil {
+		return nil, createParseError("Unimplemented.")
+	}
+
+	return prefix()
+}
+
+func (p *Parser) parseIdent() (ast.Expression, error) {
+	return &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}, nil
 }
 
 // Utilities
@@ -131,4 +180,12 @@ func (p *Parser) expect(t token.TokenType) (bool, error) {
 
 func (p *Parser) peekTokenIs(t token.TokenType) bool { return p.peekToken.Type == t }
 
-func (p *Parser) curTokenIs(t token.TokenType) bool { return p.curToken.Type == t }
+// func (p *Parser) curTokenIs(t token.TokenType) bool { return p.curToken.Type == t }
+
+func (p *Parser) registerPrefix(tokenType token.TokenType, fn prefixParseFn) {
+	p.prefixParseFns[tokenType] = fn
+}
+
+func (p *Parser) registerInfix(tokenType token.TokenType, fn infixParseFn) {
+	p.infixParseFns[tokenType] = fn
+}
