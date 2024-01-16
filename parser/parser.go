@@ -78,6 +78,8 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerPrefix(token.TRUE, p.parseBoolean)
 	p.registerPrefix(token.FALSE, p.parseBoolean)
 	p.registerPrefix(token.RPAREN, p.parseGrouped)
+	p.registerPrefix(token.IF, p.parseIfExpression)
+	p.registerPrefix(token.FUNCTION, p.parseFunctionLiteral)
 	for k := range precedences {
 		p.registerInfix(k, p.parseInfixExpression)
 	}
@@ -99,11 +101,11 @@ func (p *Parser) ParseProgram() (*ast.Program, error) {
 	program.Statements = []ast.Statement{}
 
 	for p.curToken.Type != token.EOF {
-		stmt, err := p.parseStatement()
-		if err != nil {
-			return nil, err
-		} else {
+		if stmt, err := p.parseStatement(); err == nil {
 			program.Statements = append(program.Statements, stmt)
+		} else {
+
+			return nil, err
 		}
 		p.nextToken()
 	}
@@ -137,13 +139,11 @@ func (p *Parser) parseLetStatement() (*ast.LetStatement, error) {
 		return nil, err
 	}
 
-	exp, experr := p.parseExpression(LOWEST)
-
-	if experr != nil {
-		return nil, experr
+	if exp, err := p.parseExpression(LOWEST); err == nil {
+		stmt.Value = exp
+	} else {
+		return nil, err
 	}
-
-	stmt.Value = exp
 
 	return stmt, nil
 }
@@ -153,29 +153,47 @@ func (p *Parser) parseReturnStatement() (*ast.ReturnStatement, error) {
 
 	p.nextToken()
 
-	exp, err := p.parseExpression(LOWEST)
-	if err != nil {
+	if exp, err := p.parseExpression(LOWEST); err == nil {
+		stmt.ReturnValue = exp
+	} else {
 		return nil, err
 	}
 
-	stmt.ReturnValue = exp
 	return stmt, nil
 }
 
 func (p *Parser) parseExpressionStatement() (*ast.ExpressionStatement, error) {
 	stmt := &ast.ExpressionStatement{Token: p.curToken}
 
-	exp, err := p.parseExpression(LOWEST)
-	if err != nil {
+	if exp, err := p.parseExpression(LOWEST); err == nil {
+		stmt.Expression = exp
+	} else {
 		return nil, err
 	}
-	stmt.Expression = exp
 
 	if p.peekTokenIs(token.SEMICOLON) {
 		p.nextToken()
 	}
 
 	return stmt, nil
+}
+
+func (p *Parser) parseBlockStatement() (*ast.BlockStatement, error) {
+	block := &ast.BlockStatement{Token: p.curToken, Statements: []ast.Statement{}}
+
+	p.nextToken()
+
+	for !p.curTokenIs(token.RBRACE) && !p.curTokenIs(token.EOF) { // may cause weird behavior
+		if stmt, err := p.parseStatement(); err == nil {
+			block.Statements = append(block.Statements, stmt)
+		} else {
+			return nil, err
+		}
+
+		p.nextToken()
+	}
+
+	return block, nil
 }
 
 // Expressions
@@ -216,12 +234,12 @@ func (p *Parser) parseIdent() (ast.Expression, error) {
 func (p *Parser) parseInt() (ast.Expression, error) {
 	lit := &ast.IntegerLiteral{Token: p.curToken}
 
-	value, err := strconv.ParseInt(p.curToken.Literal, 0, 64)
-	if err != nil {
+	if value, err := strconv.ParseInt(p.curToken.Literal, 0, 64); err == nil {
+		lit.Value = value
+	} else {
 		return nil, createParseError("Expected integer literal, got unparseable %q instead", p.curToken.Literal)
 	}
 
-	lit.Value = value
 	return lit, nil
 }
 
@@ -233,11 +251,11 @@ func (p *Parser) parsePrefixExpression() (ast.Expression, error) {
 
 	p.nextToken()
 
-	rhs, err := p.parseExpression(PREFIX)
-	if err != nil {
+	if rhs, err := p.parseExpression(PREFIX); err == nil {
+		expr.Right = rhs
+	} else {
 		return nil, err
 	}
-	expr.Right = rhs
 
 	return expr, nil
 }
@@ -251,11 +269,12 @@ func (p *Parser) parseInfixExpression(left ast.Expression) (ast.Expression, erro
 
 	precedence := p.curPrecedence()
 	p.nextToken()
-	rhs, err := p.parseExpression(precedence)
-	if err != nil {
+
+	if rhs, err := p.parseExpression(precedence); err == nil {
+		expression.Right = rhs
+	} else {
 		return nil, err
 	}
-	expression.Right = rhs
 
 	return expression, nil
 }
@@ -277,6 +296,105 @@ func (p *Parser) parseGrouped() (ast.Expression, error) {
 	}
 
 	return exp, nil
+}
+
+func (p *Parser) parseIfExpression() (ast.Expression, error) {
+	expression := &ast.IfExpression{Token: p.curToken}
+
+	if ok, err := p.expect(token.LPAREN); !ok {
+		return nil, err
+	}
+
+	p.nextToken()
+	if cond, err := p.parseExpression(LOWEST); err == nil {
+		expression.Condition = cond
+	} else {
+		return nil, err
+	}
+
+	if ok, err := p.expect(token.RPAREN); !ok {
+		return nil, err
+	}
+	if ok, err := p.expect(token.LBRACE); !ok {
+		return nil, err
+	}
+
+	if cons, err := p.parseBlockStatement(); err == nil {
+		expression.Consequence = cons
+	} else {
+		return nil, err
+	}
+
+	if p.peekTokenIs(token.ELSE) {
+		p.nextToken()
+
+		if ok, err := p.expect(token.LBRACE); !ok {
+			return nil, err
+		}
+
+		if alt, err := p.parseBlockStatement(); err == nil {
+			expression.Alternative = alt
+		} else {
+			return nil, err
+		}
+	}
+
+	return expression, nil
+}
+
+func (p *Parser) parseFunctionLiteral() (ast.Expression, error) {
+	lit := &ast.FunctionLiteral{Token: p.curToken}
+
+	if ok, err := p.expect(token.LPAREN); !ok {
+		return nil, err
+	}
+
+	if params, err := p.parseFunctionParameters(); err == nil {
+		lit.Parameters = params
+	} else {
+		return nil, err
+	}
+
+	if ok, err := p.expect(token.LBRACE); !ok {
+		return nil, err
+	}
+
+	if body, err := p.parseBlockStatement(); err == nil {
+		lit.Body = body
+	} else {
+		return nil, err
+	}
+
+	return lit, nil
+}
+
+func (p *Parser) parseFunctionParameters() ([]*ast.Identifier, error) {
+	ids := []*ast.Identifier{}
+
+	if p.peekTokenIs(token.RPAREN) { // Empty list
+		p.nextToken()
+		return ids, nil
+	}
+
+	p.nextToken()
+
+	// First ident
+	ident := &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+	ids = append(ids, ident)
+
+	for p.peekTokenIs(token.COMMA) {
+		p.nextToken()
+		p.nextToken()
+
+		id := &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+		ids = append(ids, id)
+	}
+
+	if ok, err := p.expect(token.RPAREN); !ok {
+		return nil, err
+	}
+
+	return ids, nil
 }
 
 // Utilities
