@@ -479,3 +479,36 @@ func testIdentifier(t *testing.T, exp ast.Expression, value string) bool {
 
 	return true
 }
+
+func TestBooleanLiteralExpression(t *testing.T) {
+	input := "true;"
+
+	l := lexer.New(input)
+	p := New(l)
+	program, err := p.ParseProgram()
+	if err != nil {
+		t.Fatalf("Error: %q. Dump: \n%q", err.Error(), program.String())
+	}
+
+	if len(program.Statements) != 1 {
+		t.Fatalf("program has not enough statements. got=%d",
+			len(program.Statements))
+	}
+	stmt, ok := program.Statements[0].(*ast.ExpressionStatement)
+	if !ok {
+		t.Fatalf("program.Statements[0] is not ast.ExpressionStatement. got=%T",
+			program.Statements[0])
+	}
+
+	literal, ok := stmt.Expression.(*ast.Boolean)
+	if !ok {
+		t.Fatalf("exp not *ast.IntegerLiteral. got=%T", stmt.Expression)
+	}
+	if literal.Value != true {
+		t.Errorf("literal.Value not %t. got=%t", true, literal.Value)
+	}
+	if literal.TokenLiteral() != "true" {
+		t.Errorf("literal.TokenLiteral not %s. got=%s", "true",
+			literal.TokenLiteral())
+	}
+}

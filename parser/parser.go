@@ -75,6 +75,9 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerPrefix(token.INT, p.parseInt)
 	p.registerPrefix(token.BANG, p.parsePrefixExpression)
 	p.registerPrefix(token.MINUS, p.parsePrefixExpression)
+	p.registerPrefix(token.TRUE, p.parseBoolean)
+	p.registerPrefix(token.FALSE, p.parseBoolean)
+	p.registerPrefix(token.RPAREN, p.parseGrouped)
 	for k := range precedences {
 		p.registerInfix(k, p.parseInfixExpression)
 	}
@@ -257,6 +260,25 @@ func (p *Parser) parseInfixExpression(left ast.Expression) (ast.Expression, erro
 	return expression, nil
 }
 
+func (p *Parser) parseBoolean() (ast.Expression, error) {
+	return &ast.Boolean{Token: p.curToken, Value: p.curTokenIs(token.TRUE)}, nil
+}
+
+func (p *Parser) parseGrouped() (ast.Expression, error) {
+	p.nextToken()
+
+	exp, err := p.parseExpression(LOWEST)
+	if err != nil {
+		return nil, err
+	}
+
+	if ok, _ := p.expect(token.RPAREN); !ok {
+		return nil, createParseError("Expected closing parenthesis.")
+	}
+
+	return exp, nil
+}
+
 // Utilities
 
 func (p *Parser) expect(t token.TokenType) (bool, error) {
@@ -270,7 +292,7 @@ func (p *Parser) expect(t token.TokenType) (bool, error) {
 
 func (p *Parser) peekTokenIs(t token.TokenType) bool { return p.peekToken.Type == t }
 
-// func (p *Parser) curTokenIs(t token.TokenType) bool { return p.curToken.Type == t }
+func (p *Parser) curTokenIs(t token.TokenType) bool { return p.curToken.Type == t }
 
 func (p *Parser) registerPrefix(tokenType token.TokenType, fn prefixParseFn) {
 	p.prefixParseFns[tokenType] = fn
