@@ -132,7 +132,7 @@ func (l *Lexer) handleIdentifier() (token.TokenType, string) {
 }
 
 func isLetter(r rune) bool {
-	return 'a' <= r && r <= 'z' || r == '_' || r == '?' || r == '!' // TODO: Deal with bang separately
+	return 'a' <= r && r <= 'z' || r == '_' || r == '?' || r == '!'
 }
 
 func isDigit(ch rune) bool {
