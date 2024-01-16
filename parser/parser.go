@@ -35,6 +35,7 @@ var precedences = map[token.TokenType]int{
 	token.CARET:     SPECIAL,
 	token.SHOVL:     SPECIAL,
 	token.SHOVR:     SPECIAL,
+	token.LPAREN:    CALL,
 }
 
 // Error
@@ -77,12 +78,13 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerPrefix(token.MINUS, p.parsePrefixExpression)
 	p.registerPrefix(token.TRUE, p.parseBoolean)
 	p.registerPrefix(token.FALSE, p.parseBoolean)
-	p.registerPrefix(token.RPAREN, p.parseGrouped)
+	p.registerPrefix(token.LPAREN, p.parseGrouped)
 	p.registerPrefix(token.IF, p.parseIfExpression)
 	p.registerPrefix(token.FUNCTION, p.parseFunctionLiteral)
 	for k := range precedences {
 		p.registerInfix(k, p.parseInfixExpression)
 	}
+	p.registerInfix(token.LPAREN, p.parseCallExpression)
 
 	// Set both tokens
 	p.nextToken()
@@ -104,7 +106,6 @@ func (p *Parser) ParseProgram() (*ast.Program, error) {
 		if stmt, err := p.parseStatement(); err == nil {
 			program.Statements = append(program.Statements, stmt)
 		} else {
-
 			return nil, err
 		}
 		p.nextToken()
@@ -395,6 +396,49 @@ func (p *Parser) parseFunctionParameters() ([]*ast.Identifier, error) {
 	}
 
 	return ids, nil
+}
+
+func (p *Parser) parseCallExpression(function ast.Expression) (ast.Expression, error) {
+	exp := &ast.CallExpression{Token: p.curToken, Function: function}
+	if args, err := p.parseCallArguments(); err == nil {
+		exp.Arguments = args
+	} else {
+		return nil, err
+	}
+	return exp, nil
+}
+
+func (p *Parser) parseCallArguments() ([]ast.Expression, error) {
+	args := []ast.Expression{}
+
+	if p.peekTokenIs(token.RPAREN) { // Empty
+		p.nextToken()
+		return args, nil
+	}
+
+	p.nextToken()
+	if arg, err := p.parseExpression(LOWEST); err == nil {
+		args = append(args, arg)
+	} else {
+		return nil, err
+	}
+
+	for p.peekTokenIs(token.COMMA) {
+		p.nextToken()
+		p.nextToken()
+
+		if arg, err := p.parseExpression(LOWEST); err == nil {
+			args = append(args, arg)
+		} else {
+			return nil, err
+		}
+	}
+
+	if ok, err := p.expect(token.RPAREN); !ok {
+		return nil, err
+	}
+
+	return args, nil
 }
 
 // Utilities
