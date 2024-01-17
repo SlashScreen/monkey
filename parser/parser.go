@@ -160,6 +160,8 @@ func (p *Parser) parseReturnStatement() (*ast.ReturnStatement, error) {
 		return nil, err
 	}
 
+	p.nextToken() // Could be an issue here
+
 	return stmt, nil
 }
 

@@ -11,7 +11,7 @@ func (t *TreeWalker) Eval(node ast.Node) (object.Object, error) {
 	switch node := node.(type) {
 	// Statmements
 	case *ast.Program:
-		return t.evalStatements(node.Statements)
+		return t.evalProgram(node.Statements)
 	case *ast.ExpressionStatement:
 		return t.Eval(node.Expression)
 	// Expressions
@@ -35,13 +35,23 @@ func (t *TreeWalker) Eval(node ast.Node) (object.Object, error) {
 			return object.NULL, err
 		}
 		return t.evalInfix(node.Operator, left, right)
+	case *ast.BlockStatement:
+		return t.evalBlock(node)
+	case *ast.IfExpression:
+		return t.evalIfExpression(node)
+	case *ast.ReturnStatement:
+		if val, err := t.Eval(node.ReturnValue); err == nil {
+			return &object.ReturnValue{Value: val}, nil
+		} else {
+			return nil, err
+		}
 	// Else
 	default:
 		return object.NULL, createEvalError("Unimplemented.")
 	}
 }
 
-func (t *TreeWalker) evalStatements(stmts []ast.Statement) (object.Object, error) {
+func (t *TreeWalker) evalProgram(stmts []ast.Statement) (object.Object, error) {
 	var result object.Object
 
 	for _, statement := range stmts {
@@ -49,6 +59,10 @@ func (t *TreeWalker) evalStatements(stmts []ast.Statement) (object.Object, error
 			result = res
 		} else {
 			return object.NULL, err
+		}
+
+		if returnValue, ok := result.(*object.ReturnValue); ok {
+			return returnValue.Value, nil
 		}
 	}
 
@@ -138,4 +152,50 @@ func (t *TreeWalker) evalIntegerInfix(op string, left, right object.Object) (obj
 	default:
 		return object.NULL, createEvalError("Operator %q cannot operate with a %q and %q", op, left.Type(), right.Type())
 	}
+}
+
+func (t *TreeWalker) evalIfExpression(ie *ast.IfExpression) (object.Object, error) {
+	condition, err := t.Eval(ie.Condition)
+	if err != nil {
+		return nil, err
+	}
+
+	if t.isTruthy(condition) {
+		return t.Eval(ie.Consequence)
+	} else if ie.Alternative != nil {
+		return t.Eval(ie.Alternative)
+	} else {
+		return object.NULL, nil
+	}
+}
+
+func (t *TreeWalker) isTruthy(obj object.Object) bool {
+	switch obj {
+	case object.NULL:
+		return false
+	case object.TRUE:
+		return true
+	case object.FALSE:
+		return false
+	default:
+		return true
+	}
+}
+
+func (t *TreeWalker) evalBlock(block *ast.BlockStatement) (object.Object, error) {
+	var res object.Object
+
+	for _, statement := range block.Statements {
+		if result, err := t.Eval(statement); err == nil {
+			res = result
+
+			if result.Type() == object.RETURN_VALUE_OBJ {
+				return result, nil
+			}
+		} else {
+			return nil, err
+		}
+	}
+
+	return res, nil
 }
