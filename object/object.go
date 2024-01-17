@@ -1,11 +1,19 @@
 package object
 
-import "fmt"
+import (
+	"fmt"
+)
 
 const (
 	INTEGER_OBJ = "INTEGER"
 	BOOLEAN_OBJ = "BOOLEAN"
 	NULL_OBJ    = "NULL"
+)
+
+var (
+	NULL  = &Null{}
+	TRUE  = &Boolean{Value: true}
+	FALSE = &Boolean{Value: false}
 )
 
 type (
@@ -40,3 +48,12 @@ type Null struct{}
 
 func (n *Null) Type() ObjectType { return NULL_OBJ }
 func (n *Null) Inspect() string  { return "null" }
+
+// UTILS
+
+func NativeToBooleanObject(input bool) *Boolean {
+	if input {
+		return TRUE
+	}
+	return FALSE
+}
