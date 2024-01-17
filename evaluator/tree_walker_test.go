@@ -194,3 +194,63 @@ if (10 > 1) {
 		testIntegerObject(t, evaluated, tt.expected)
 	}
 }
+
+func TestErrorHandling(t *testing.T) {
+	tests := []struct {
+		input           string
+		expectedMessage string
+	}{
+		{
+			"5 + true;",
+			"type mismatch: INTEGER + BOOLEAN",
+		},
+		{
+			"5 + true; 5;",
+			"type mismatch: INTEGER + BOOLEAN",
+		},
+		{
+			"-true",
+			"cannot apply - operator to BOOLEAN",
+		},
+		{
+			"true + false;",
+			"operator + cannot operate with a BOOLEAN and BOOLEAN",
+		},
+		{
+			"5; true + false; 5",
+			"operator + cannot operate with a BOOLEAN and BOOLEAN",
+		},
+		{
+			"if (10 > 1) { true + false; }",
+			"operator + cannot operate with a BOOLEAN and BOOLEAN",
+		},
+		{
+			`
+if (10 > 1) {
+  if (10 > 1) {
+    return true + false;
+  }
+
+  return 1;
+}
+`,
+			"operator + cannot operate with a BOOLEAN and BOOLEAN",
+		},
+	}
+
+	for _, tt := range tests {
+		evaluated, _ := testEval(tt.input)
+
+		errObj, ok := evaluated.(*object.Error)
+		if !ok {
+			t.Errorf("no error object returned. got=%T(%+v)",
+				evaluated, evaluated)
+			continue
+		}
+
+		if errObj.Message.Error() != tt.expectedMessage {
+			t.Errorf("wrong error message. expected=%q, got=%q",
+				tt.expectedMessage, errObj.Message)
+		}
+	}
+}

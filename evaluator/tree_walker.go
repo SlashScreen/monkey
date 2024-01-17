@@ -21,18 +21,27 @@ func (t *TreeWalker) Eval(node ast.Node) (object.Object, error) {
 		return object.NativeToBooleanObject(node.Value), nil
 	case *ast.PrefixExpression:
 		if right, err := t.Eval(node.Right); err == nil {
+			if isError(right) {
+				return right, right.(*object.Error).Message
+			}
 			return t.evalPrefix(node.Operator, right)
 		} else {
-			return nil, err
+			return &object.Error{Message: err}, err
 		}
 	case *ast.InfixExpression:
 		left, err := t.Eval(node.Left)
 		if err != nil {
-			return object.NULL, err
+			return &object.Error{Message: err}, err
+		}
+		if isError(left) {
+			return left, left.(*object.Error).Message
 		}
 		right, err := t.Eval(node.Right)
 		if err != nil {
-			return object.NULL, err
+			return &object.Error{Message: err}, err
+		}
+		if isError(right) {
+			return right, right.(*object.Error).Message
 		}
 		return t.evalInfix(node.Operator, left, right)
 	case *ast.BlockStatement:
@@ -43,7 +52,7 @@ func (t *TreeWalker) Eval(node ast.Node) (object.Object, error) {
 		if val, err := t.Eval(node.ReturnValue); err == nil {
 			return &object.ReturnValue{Value: val}, nil
 		} else {
-			return nil, err
+			return &object.Error{Message: err}, err
 		}
 	// Else
 	default:
@@ -58,11 +67,14 @@ func (t *TreeWalker) evalProgram(stmts []ast.Statement) (object.Object, error) {
 		if res, err := t.Eval(statement); err == nil {
 			result = res
 		} else {
-			return object.NULL, err
+			return &object.Error{err}, err
 		}
 
-		if returnValue, ok := result.(*object.ReturnValue); ok {
-			return returnValue.Value, nil
+		switch result := result.(type) {
+		case *object.ReturnValue:
+			return result.Value, nil
+		case *object.Error:
+			return result, result.Message
 		}
 	}
 
@@ -76,7 +88,8 @@ func (t *TreeWalker) evalPrefix(op string, right object.Object) (object.Object, 
 	case "-":
 		return t.evalNegOperator(right)
 	default:
-		return object.NULL, nil
+		err := createEvalError("unknown operator: %s%s", op, right.Type())
+		return &object.Error{Message: err}, err
 	}
 }
 
@@ -89,13 +102,15 @@ func (t *TreeWalker) evalBangOperator(right object.Object) (object.Object, error
 	case object.NULL:
 		return object.TRUE, nil
 	default:
-		return object.NULL, createEvalError("Cannot apply ! operator to %q", right.Type())
+		err := createEvalError("cannot apply ! operator to %s", right.Type())
+		return &object.Error{Message: err}, err
 	}
 }
 
 func (t *TreeWalker) evalNegOperator(right object.Object) (object.Object, error) {
 	if right.Type() != object.INTEGER_OBJ {
-		return nil, createEvalError("Cannot negate a value of type %s", right.Type())
+		err := createEvalError("cannot apply - operator to %s", right.Type())
+		return &object.Error{Message: err}, err
 	}
 
 	value := right.(*object.Integer).Value
@@ -110,9 +125,12 @@ func (t *TreeWalker) evalInfix(op string, left, right object.Object) (object.Obj
 		return object.NativeToBooleanObject(left == right), nil
 	case op == "!=":
 		return object.NativeToBooleanObject(left != right), nil
-
+	case left.Type() != right.Type():
+		err := createEvalError("type mismatch: %s %s %s", left.Type(), op, right.Type())
+		return &object.Error{Message: err}, err
 	default:
-		return object.NULL, createEvalError("Operator %q cannot operate with a %q and %q", op, left.Type(), right.Type())
+		err := createEvalError("operator %s cannot operate with a %s and %s", op, left.Type(), right.Type())
+		return &object.Error{Message: err}, err
 	}
 }
 
@@ -150,14 +168,18 @@ func (t *TreeWalker) evalIntegerInfix(op string, left, right object.Object) (obj
 	case "!=":
 		return object.NativeToBooleanObject(leftVal != rightVal), nil
 	default:
-		return object.NULL, createEvalError("Operator %q cannot operate with a %q and %q", op, left.Type(), right.Type())
+		err := createEvalError("operator %s cannot operate with a %s and %s", op, left.Type(), right.Type())
+		return &object.Error{Message: err}, err
 	}
 }
 
 func (t *TreeWalker) evalIfExpression(ie *ast.IfExpression) (object.Object, error) {
 	condition, err := t.Eval(ie.Condition)
 	if err != nil {
-		return nil, err
+		return &object.Error{Message: err}, err
+	}
+	if isError(condition) {
+		return condition, condition.(*object.Error).Message
 	}
 
 	if t.isTruthy(condition) {
@@ -189,13 +211,20 @@ func (t *TreeWalker) evalBlock(block *ast.BlockStatement) (object.Object, error)
 		if result, err := t.Eval(statement); err == nil {
 			res = result
 
-			if result.Type() == object.RETURN_VALUE_OBJ {
+			if result.Type() == object.RETURN_VALUE_OBJ || result.Type() == object.ERROR_OBJ {
 				return result, nil
 			}
 		} else {
-			return nil, err
+			return &object.Error{Message: err}, err
 		}
 	}
 
 	return res, nil
+}
+
+func isError(obj object.Object) bool {
+	if obj != nil {
+		return obj.Type() == object.ERROR_OBJ
+	}
+	return false
 }
