@@ -67,7 +67,7 @@ func (t *TreeWalker) evalProgram(stmts []ast.Statement) (object.Object, error) {
 		if res, err := t.Eval(statement); err == nil {
 			result = res
 		} else {
-			return &object.Error{err}, err
+			return &object.Error{Message: err}, err
 		}
 
 		switch result := result.(type) {
