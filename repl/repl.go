@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"monkey/evaluator"
 	"monkey/lexer"
 	"monkey/parser"
 	"strings"
@@ -30,7 +31,12 @@ func Start(in io.Reader, out io.Writer) {
 			p := parser.New(l)
 
 			if res, err := p.ParseProgram(); err == nil {
-				io.WriteString(out, res.String())
+				t := &evaluator.TreeWalker{}
+				if eval, err := t.Eval(res); err == nil {
+					io.WriteString(out, eval.Inspect())
+				} else {
+					io.WriteString(out, err.Error())
+				}
 			} else {
 				io.WriteString(out, err.Error())
 			}
