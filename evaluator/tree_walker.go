@@ -82,6 +82,12 @@ func (t *TreeWalker) Eval(node ast.Node, env *object.Environment) (object.Object
 		return t.applyFunction(function, args)
 	case *ast.StringLiteral:
 		return &object.String{Value: node.Value}, nil
+	case *ast.ArrayLiteral:
+		elements, err := t.evalExpressions(node.Elements, env)
+		if len(elements) == 1 && err != nil {
+			return elements[0], err
+		}
+		return &object.Array{Elements: elements}, nil
 	// Else
 	default:
 		return object.NULL, createEvalError("Unimplemented.")
