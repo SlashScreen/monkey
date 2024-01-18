@@ -7,20 +7,20 @@ import (
 
 type TreeWalker struct{}
 
-func (t *TreeWalker) Eval(node ast.Node) (object.Object, error) {
+func (t *TreeWalker) Eval(node ast.Node, env *object.Environment) (object.Object, error) {
 	switch node := node.(type) {
 	// Statmements
 	case *ast.Program:
-		return t.evalProgram(node.Statements)
+		return t.evalProgram(node.Statements, env)
 	case *ast.ExpressionStatement:
-		return t.Eval(node.Expression)
+		return t.Eval(node.Expression, env)
 	// Expressions
 	case *ast.IntegerLiteral:
 		return &object.Integer{Value: node.Value}, nil
 	case *ast.Boolean:
 		return object.NativeToBooleanObject(node.Value), nil
 	case *ast.PrefixExpression:
-		if right, err := t.Eval(node.Right); err == nil {
+		if right, err := t.Eval(node.Right, env); err == nil {
 			if isError(right) {
 				return right, right.(*object.Error).Message
 			}
@@ -29,14 +29,14 @@ func (t *TreeWalker) Eval(node ast.Node) (object.Object, error) {
 			return &object.Error{Message: err}, err
 		}
 	case *ast.InfixExpression:
-		left, err := t.Eval(node.Left)
+		left, err := t.Eval(node.Left, env)
 		if err != nil {
 			return &object.Error{Message: err}, err
 		}
 		if isError(left) {
 			return left, left.(*object.Error).Message
 		}
-		right, err := t.Eval(node.Right)
+		right, err := t.Eval(node.Right, env)
 		if err != nil {
 			return &object.Error{Message: err}, err
 		}
@@ -45,26 +45,35 @@ func (t *TreeWalker) Eval(node ast.Node) (object.Object, error) {
 		}
 		return t.evalInfix(node.Operator, left, right)
 	case *ast.BlockStatement:
-		return t.evalBlock(node)
+		return t.evalBlock(node, env)
 	case *ast.IfExpression:
-		return t.evalIfExpression(node)
+		return t.evalIfExpression(node, env)
 	case *ast.ReturnStatement:
-		if val, err := t.Eval(node.ReturnValue); err == nil {
+		if val, err := t.Eval(node.ReturnValue, env); err == nil {
 			return &object.ReturnValue{Value: val}, nil
 		} else {
 			return &object.Error{Message: err}, err
 		}
+	case *ast.LetStatement:
+		if val, err := t.Eval(node.Value, env); err == nil {
+			env.Set(node.Name.Value, val)
+			return val, nil
+		} else {
+			return object.ErrorPair(err)
+		}
+	case *ast.Identifier:
+		return t.evalIdentifier(node, env)
 	// Else
 	default:
 		return object.NULL, createEvalError("Unimplemented.")
 	}
 }
 
-func (t *TreeWalker) evalProgram(stmts []ast.Statement) (object.Object, error) {
+func (t *TreeWalker) evalProgram(stmts []ast.Statement, env *object.Environment) (object.Object, error) {
 	var result object.Object
 
 	for _, statement := range stmts {
-		if res, err := t.Eval(statement); err == nil {
+		if res, err := t.Eval(statement, env); err == nil {
 			result = res
 		} else {
 			return &object.Error{Message: err}, err
@@ -173,8 +182,8 @@ func (t *TreeWalker) evalIntegerInfix(op string, left, right object.Object) (obj
 	}
 }
 
-func (t *TreeWalker) evalIfExpression(ie *ast.IfExpression) (object.Object, error) {
-	condition, err := t.Eval(ie.Condition)
+func (t *TreeWalker) evalIfExpression(ie *ast.IfExpression, env *object.Environment) (object.Object, error) {
+	condition, err := t.Eval(ie.Condition, env)
 	if err != nil {
 		return &object.Error{Message: err}, err
 	}
@@ -183,9 +192,9 @@ func (t *TreeWalker) evalIfExpression(ie *ast.IfExpression) (object.Object, erro
 	}
 
 	if t.isTruthy(condition) {
-		return t.Eval(ie.Consequence)
+		return t.Eval(ie.Consequence, env)
 	} else if ie.Alternative != nil {
-		return t.Eval(ie.Alternative)
+		return t.Eval(ie.Alternative, env)
 	} else {
 		return object.NULL, nil
 	}
@@ -204,11 +213,11 @@ func (t *TreeWalker) isTruthy(obj object.Object) bool {
 	}
 }
 
-func (t *TreeWalker) evalBlock(block *ast.BlockStatement) (object.Object, error) {
+func (t *TreeWalker) evalBlock(block *ast.BlockStatement, env *object.Environment) (object.Object, error) {
 	var res object.Object
 
 	for _, statement := range block.Statements {
-		if result, err := t.Eval(statement); err == nil {
+		if result, err := t.Eval(statement, env); err == nil {
 			res = result
 
 			if result.Type() == object.RETURN_VALUE_OBJ || result.Type() == object.ERROR_OBJ {
@@ -227,4 +236,13 @@ func isError(obj object.Object) bool {
 		return obj.Type() == object.ERROR_OBJ
 	}
 	return false
+}
+
+func (t *TreeWalker) evalIdentifier(node *ast.Identifier, env *object.Environment) (object.Object, error) {
+	if val, ok := env.Get(node.Value); ok {
+		return val, nil
+	} else {
+		err := createEvalError("identifier not found: %s", node.Value)
+		return &object.Error{Message: err}, err
+	}
 }

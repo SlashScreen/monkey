@@ -140,10 +140,16 @@ func (p *Parser) parseLetStatement() (*ast.LetStatement, error) {
 		return nil, err
 	}
 
+	p.nextToken()
+
 	if exp, err := p.parseExpression(LOWEST); err == nil {
 		stmt.Value = exp
 	} else {
 		return nil, err
+	}
+
+	if p.peekTokenIs(token.SEMICOLON) { // FIXME: This
+		p.nextToken()
 	}
 
 	return stmt, nil
@@ -173,6 +179,8 @@ func (p *Parser) parseExpressionStatement() (*ast.ExpressionStatement, error) {
 	} else {
 		return nil, err
 	}
+
+	p.nextToken()
 
 	if p.peekTokenIs(token.SEMICOLON) {
 		p.nextToken()

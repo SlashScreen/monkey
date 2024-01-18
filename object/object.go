@@ -77,3 +77,7 @@ func NativeToBooleanObject(input bool) *Boolean {
 	}
 	return FALSE
 }
+
+func ErrorPair(msg error) (*Error, error) {
+	return &Error{Message: msg}, msg
+}

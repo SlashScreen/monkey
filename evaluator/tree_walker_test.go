@@ -36,8 +36,9 @@ func testEval(input string) (object.Object, error) {
 	}
 
 	t := &TreeWalker{}
+	env := object.NewEnvironemnt()
 
-	return t.Eval(program)
+	return t.Eval(program, env)
 }
 
 func testIntegerObject(t *testing.T, obj object.Object, expected int64) bool {
@@ -225,6 +226,10 @@ func TestErrorHandling(t *testing.T) {
 			"operator + cannot operate with a BOOLEAN and BOOLEAN",
 		},
 		{
+			"foobar",
+			"identifier not found: foobar",
+		},
+		{
 			`
 if (10 > 1) {
   if (10 > 1) {
@@ -251,6 +256,26 @@ if (10 > 1) {
 		if errObj.Message.Error() != tt.expectedMessage {
 			t.Errorf("wrong error message. expected=%q, got=%q",
 				tt.expectedMessage, errObj.Message)
+		}
+	}
+}
+
+func TestLetStatements(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected int64
+	}{
+		{"let a = 5; a;", 5},
+		{"let a = 5 * 5; a;", 25},
+		{"let a = 5; let b = a; b;", 5},
+		{"let a = 5; let b = a; let c = a + b + 5; c;", 15},
+	}
+
+	for _, tt := range tests {
+		if res, err := testEval(tt.input); err == nil {
+			testIntegerObject(t, res, tt.expected)
+		} else {
+			t.Fatal(err)
 		}
 	}
 }
