@@ -174,6 +174,8 @@ func (t *TreeWalker) evalInfix(op string, left, right object.Object) (object.Obj
 		return &object.Error{Message: err}, err
 	case left.Type() == object.STRING_OBJ && right.Type() == object.STRING_OBJ:
 		return t.evalStringInfix(op, left, right)
+	case left.Type() == object.ARRAY_OBJ:
+		return t.evalArrayInfix(op, left, right)
 	default:
 		return object.ErrorPair(createEvalError("operator %s cannot operate with a %s and %s", op, left.Type(), right.Type()))
 	}
@@ -224,6 +226,20 @@ func (t *TreeWalker) evalStringInfix(op string, left, right object.Object) (obje
 	switch op {
 	case "+", "<<":
 		return &object.String{Value: leftVal + rightVal}, nil
+	default:
+		return object.ErrorPair(createEvalError("operator %s cannot operate with a %s and %s", op, left.Type(), right.Type()))
+	}
+}
+
+func (t *TreeWalker) evalArrayInfix(op string, left, right object.Object) (object.Object, error) {
+	switch op {
+	case "<<":
+		val := builtins["push"].Fn(left, right)
+		if isError(val) {
+			return val, val.(*object.Error).Message
+		} else {
+			return val, nil
+		}
 	default:
 		return object.ErrorPair(createEvalError("operator %s cannot operate with a %s and %s", op, left.Type(), right.Type()))
 	}
