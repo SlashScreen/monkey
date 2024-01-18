@@ -82,6 +82,7 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerPrefix(token.IF, p.parseIfExpression)
 	p.registerPrefix(token.FUNCTION, p.parseFunctionLiteral)
 	p.registerPrefix(token.STRING, p.parseStringLiteral)
+	p.registerPrefix(token.LBRACKET, p.parseArrayLiteral)
 	for k := range precedences {
 		p.registerInfix(k, p.parseInfixExpression)
 	}
@@ -454,6 +455,50 @@ func (p *Parser) parseCallArguments() ([]ast.Expression, error) {
 
 func (p *Parser) parseStringLiteral() (ast.Expression, error) {
 	return &ast.StringLiteral{Token: p.curToken, Value: p.curToken.Literal}, nil
+}
+
+func (p *Parser) parseArrayLiteral() (ast.Expression, error) {
+	array := &ast.ArrayLiteral{Token: p.curToken}
+
+	if els, err := p.parseExpressionList(token.RBRACKET); err == nil {
+		array.Elements = els
+	} else {
+		return nil, err
+	}
+
+	return array, nil
+}
+
+func (p *Parser) parseExpressionList(end token.TokenType) ([]ast.Expression, error) {
+	list := []ast.Expression{}
+
+	if p.peekTokenIs(end) {
+		p.nextToken()
+		return list, nil
+	}
+
+	p.nextToken()
+
+	if expr, err := p.parseExpression(LOWEST); err == nil {
+		list = append(list, expr)
+	} else {
+		return []ast.Expression{}, err
+	}
+
+	for p.peekTokenIs(token.COMMA) {
+		p.nextToken()
+		p.nextToken()
+		if expr, err := p.parseExpression(LOWEST); err == nil {
+			list = append(list, expr)
+		} else {
+			return []ast.Expression{}, err
+		}
+	}
+
+	if ok, err := p.expect(end); !ok {
+		return []ast.Expression{}, err
+	}
+	return list, nil
 }
 
 // Utilities

@@ -99,11 +99,20 @@ func (l *Lexer) NextToken() token.Token {
 	} else if val, ok := singleCharMatch[l.ch]; ok {
 		tok = token.New(val, string(l.ch))
 		l.readChar()
-	} else if l.ch == '"' {
-		tok = token.New(token.STRING, l.readString())
-		l.readChar()
 	} else {
-		tok = token.New(token.ILLEGAL, "")
+		switch l.ch {
+		case '"':
+			tok = token.New(token.STRING, l.readString())
+			l.readChar()
+		case '[':
+			tok = token.New(token.LBRACKET, string(l.ch))
+			l.readChar()
+		case ']':
+			tok = token.New(token.RBRACKET, string(l.ch))
+			l.readChar()
+		default:
+			tok = token.New(token.ILLEGAL, "")
+		}
 	}
 
 	return tok
