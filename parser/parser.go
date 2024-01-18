@@ -81,6 +81,7 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerPrefix(token.LPAREN, p.parseGrouped)
 	p.registerPrefix(token.IF, p.parseIfExpression)
 	p.registerPrefix(token.FUNCTION, p.parseFunctionLiteral)
+	p.registerPrefix(token.STRING, p.parseStringLiteral)
 	for k := range precedences {
 		p.registerInfix(k, p.parseInfixExpression)
 	}
@@ -449,6 +450,10 @@ func (p *Parser) parseCallArguments() ([]ast.Expression, error) {
 	}
 
 	return args, nil
+}
+
+func (p *Parser) parseStringLiteral() (ast.Expression, error) {
+	return &ast.StringLiteral{Token: p.curToken, Value: p.curToken.Literal}, nil
 }
 
 // Utilities

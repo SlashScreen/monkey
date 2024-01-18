@@ -80,6 +80,8 @@ func (t *TreeWalker) Eval(node ast.Node, env *object.Environment) (object.Object
 		}
 
 		return t.applyFunction(function, args)
+	case *ast.StringLiteral:
+		return &object.String{Value: node.Value}, nil
 	// Else
 	default:
 		return object.NULL, createEvalError("Unimplemented.")
@@ -154,9 +156,10 @@ func (t *TreeWalker) evalInfix(op string, left, right object.Object) (object.Obj
 	case left.Type() != right.Type():
 		err := createEvalError("type mismatch: %s %s %s", left.Type(), op, right.Type())
 		return &object.Error{Message: err}, err
+	case left.Type() == object.STRING_OBJ && right.Type() == object.STRING_OBJ:
+		return t.evalStringInfix(op, left, right)
 	default:
-		err := createEvalError("operator %s cannot operate with a %s and %s", op, left.Type(), right.Type())
-		return &object.Error{Message: err}, err
+		return object.ErrorPair(createEvalError("operator %s cannot operate with a %s and %s", op, left.Type(), right.Type()))
 	}
 }
 
@@ -194,8 +197,19 @@ func (t *TreeWalker) evalIntegerInfix(op string, left, right object.Object) (obj
 	case "!=":
 		return object.NativeToBooleanObject(leftVal != rightVal), nil
 	default:
-		err := createEvalError("operator %s cannot operate with a %s and %s", op, left.Type(), right.Type())
-		return &object.Error{Message: err}, err
+		return object.ErrorPair(createEvalError("operator %s cannot operate with a %s and %s", op, left.Type(), right.Type()))
+	}
+}
+
+func (t *TreeWalker) evalStringInfix(op string, left, right object.Object) (object.Object, error) {
+	leftVal := left.(*object.String).Value
+	rightVal := right.(*object.String).Value
+
+	switch op {
+	case "+", "<<":
+		return &object.String{Value: leftVal + rightVal}, nil
+	default:
+		return object.ErrorPair(createEvalError("operator %s cannot operate with a %s and %s", op, left.Type(), right.Type()))
 	}
 }
 
@@ -263,18 +277,20 @@ func (t *TreeWalker) evalExpressions(exps []ast.Expression, env *object.Environm
 }
 
 func (t *TreeWalker) applyFunction(fn object.Object, args []object.Object) (object.Object, error) {
-	function, ok := fn.(*object.Function)
-	if !ok {
+	switch fn := fn.(type) {
+	case *object.Function:
+		extendedEnv := t.extendFunctionEnv(fn, args)
+		evaluated, err := t.Eval(fn.Body, extendedEnv)
+		if err != nil {
+			return object.ErrorPair(err)
+		}
+
+		return t.unwrapReturnValue(evaluated), nil
+	case *object.Builtin:
+		return fn.Fn(args...), nil
+	default:
 		return object.ErrorPair(createEvalError("not a function: %s", fn.Type()))
 	}
-
-	extendedEnv := t.extendFunctionEnv(function, args)
-	evaluated, err := t.Eval(function.Body, extendedEnv)
-	if err != nil {
-		return object.ErrorPair(err)
-	}
-
-	return t.unwrapReturnValue(evaluated), nil
 }
 
 func (t *TreeWalker) extendFunctionEnv(fn *object.Function, args []object.Object) *object.Environment {
@@ -305,6 +321,9 @@ func (t *TreeWalker) evalIdentifier(node *ast.Identifier, env *object.Environmen
 	if val, ok := env.Get(node.Value); ok {
 		return val, nil
 	} else {
+		if builtin, ok := builtins[node.Value]; ok {
+			return builtin, nil
+		}
 		err := createEvalError("identifier not found: %s", node.Value)
 		return &object.Error{Message: err}, err
 	}

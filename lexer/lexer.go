@@ -99,6 +99,9 @@ func (l *Lexer) NextToken() token.Token {
 	} else if val, ok := singleCharMatch[l.ch]; ok {
 		tok = token.New(val, string(l.ch))
 		l.readChar()
+	} else if l.ch == '"' {
+		tok = token.New(token.STRING, l.readString())
+		l.readChar()
 	} else {
 		tok = token.New(token.ILLEGAL, "")
 	}
@@ -152,4 +155,16 @@ func (l *Lexer) peekChar() rune {
 		ch, _ := utf8.DecodeRuneInString(l.input[l.readPosition:])
 		return ch
 	}
+}
+
+func (l *Lexer) readString() string {
+	position := l.position + 1
+	for {
+		l.readChar()
+		if l.ch == '"' || l.ch == 0 {
+			break
+		}
+	}
+
+	return l.input[position:l.position]
 }

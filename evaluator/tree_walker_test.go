@@ -230,6 +230,10 @@ func TestErrorHandling(t *testing.T) {
 			"identifier not found: foobar",
 		},
 		{
+			`"Hello" - "World"`,
+			"unknown operator: STRING - STRING",
+		},
+		{
 			`
 if (10 > 1) {
   if (10 > 1) {
@@ -326,6 +330,73 @@ func TestFunctionApplication(t *testing.T) {
 			testIntegerObject(t, res, tt.expected)
 		} else {
 			t.Fatal(err)
+		}
+	}
+}
+
+func TestStringLiteral(t *testing.T) {
+	input := `"Hello World!"`
+
+	evaluated, err := testEval(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	str, ok := evaluated.(*object.String)
+	if !ok {
+		t.Fatalf("object is not String. got=%T (%+v)", evaluated, evaluated)
+	}
+
+	if str.Value != "Hello World!" {
+		t.Errorf("String has wrong value. got=%q", str.Value)
+	}
+}
+
+func TestStringConcatenation(t *testing.T) {
+	input := `"Hello" + " " + "World!"`
+
+	evaluated, err := testEval(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	str, ok := evaluated.(*object.String)
+	if !ok {
+		t.Fatalf("object is not String. got=%T (%+v)", evaluated, evaluated)
+	}
+
+	if str.Value != "Hello World!" {
+		t.Errorf("String has wrong value. got=%q", str.Value)
+	}
+}
+
+func TestBuiltinFunctions(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected interface{}
+	}{
+		{`len("")`, 0},
+		{`len("four")`, 4},
+		{`len("hello world")`, 11},
+		{`len(1)`, "cannot take the length of INTEGER"},
+		{`len("one", "two")`, "wrong number of arguments to 'len': 2"},
+	}
+
+	for _, tt := range tests {
+		evaluated, _ := testEval(tt.input)
+
+		switch expected := tt.expected.(type) {
+		case int:
+			testIntegerObject(t, evaluated, int64(expected))
+		case string:
+			errObj, ok := evaluated.(*object.Error)
+			if !ok {
+				t.Errorf("object is not Error. got=%T (%+v)",
+					evaluated, evaluated)
+				continue
+			}
+			if errObj.Message.Error() != expected {
+				t.Errorf("wrong error message. expected=%q, got=%q",
+					expected, errObj.Message)
+			}
 		}
 	}
 }
