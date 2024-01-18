@@ -88,6 +88,16 @@ func (t *TreeWalker) Eval(node ast.Node, env *object.Environment) (object.Object
 			return elements[0], err
 		}
 		return &object.Array{Elements: elements}, nil
+	case *ast.IndexExpression:
+		left, err := t.Eval(node.Left, env)
+		if err != nil {
+			return left, err
+		}
+		index, err := t.Eval(node.Index, env)
+		if err != nil {
+			return index, err
+		}
+		return t.evalIndexExpression(left, index)
 	// Else
 	default:
 		return object.NULL, createEvalError("Unimplemented.")
@@ -333,4 +343,24 @@ func (t *TreeWalker) evalIdentifier(node *ast.Identifier, env *object.Environmen
 		err := createEvalError("identifier not found: %s", node.Value)
 		return &object.Error{Message: err}, err
 	}
+}
+
+func (t *TreeWalker) evalIndexExpression(left, index object.Object) (object.Object, error) {
+	switch {
+	case left.Type() == object.ARRAY_OBJ && index.Type() == object.INTEGER_OBJ:
+		return t.evalArrayIndexExpression(left, index)
+	default:
+		return object.ErrorPair(createEvalError("Cannot index array with type %s", left.Type()))
+	}
+}
+
+func (t *TreeWalker) evalArrayIndexExpression(array, index object.Object) (object.Object, error) {
+	arrayObject := array.(*object.Array)
+	idx := index.(*object.Integer).Value
+	max := int64(len(arrayObject.Elements) - 1)
+
+	if idx < 0 || idx > max {
+		return object.ErrorPair(createEvalError("index out of bounds"))
+	}
+	return arrayObject.Elements[idx], nil
 }
