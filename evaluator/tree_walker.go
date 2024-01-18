@@ -63,6 +63,23 @@ func (t *TreeWalker) Eval(node ast.Node, env *object.Environment) (object.Object
 		}
 	case *ast.Identifier:
 		return t.evalIdentifier(node, env)
+	case *ast.FunctionLiteral:
+		return &object.Function{Parameters: node.Parameters, Body: node.Body, Env: env}, nil
+	case *ast.CallExpression:
+		function, err := t.Eval(node.Function, env)
+		if err != nil {
+			return function, err
+		}
+
+		args, err := t.evalExpressions(node.Arguments, env)
+		if err != nil {
+			return object.ErrorPair(err)
+		}
+		if len(args) == 1 && isError(args[0]) {
+			return args[0], nil
+		}
+
+		return t.applyFunction(function, args)
 	// Else
 	default:
 		return object.NULL, createEvalError("Unimplemented.")
@@ -229,6 +246,52 @@ func (t *TreeWalker) evalBlock(block *ast.BlockStatement, env *object.Environmen
 	}
 
 	return res, nil
+}
+
+func (t *TreeWalker) evalExpressions(exps []ast.Expression, env *object.Environment) ([]object.Object, error) {
+	var result []object.Object
+
+	for _, exp := range exps {
+		if evaluated, err := t.Eval(exp, env); err == nil {
+			result = append(result, evaluated)
+		} else {
+			return []object.Object{evaluated}, err
+		}
+	}
+
+	return result, nil
+}
+
+func (t *TreeWalker) applyFunction(fn object.Object, args []object.Object) (object.Object, error) {
+	function, ok := fn.(*object.Function)
+	if !ok {
+		return object.ErrorPair(createEvalError("not a function: %s", fn.Type()))
+	}
+
+	extendedEnv := t.extendFunctionEnv(function, args)
+	evaluated, err := t.Eval(function.Body, extendedEnv)
+	if err != nil {
+		return object.ErrorPair(err)
+	}
+
+	return t.unwrapReturnValue(evaluated), nil
+}
+
+func (t *TreeWalker) extendFunctionEnv(fn *object.Function, args []object.Object) *object.Environment {
+	env := object.NewEnclosedEnvironment(fn.Env)
+
+	for paramIndex, param := range fn.Parameters {
+		env.Set(param.Value, args[paramIndex])
+	}
+
+	return env
+}
+
+func (t *TreeWalker) unwrapReturnValue(obj object.Object) object.Object {
+	if ret, ok := obj.(*object.ReturnValue); ok {
+		return ret.Value
+	}
+	return obj
 }
 
 func isError(obj object.Object) bool {
