@@ -18,6 +18,7 @@ const (
 	PREFIX      // -, !
 	SPECIAL     // bitwise
 	CALL        // foo(x)
+	INDEX       // array[index]
 )
 
 var precedences = map[token.TokenType]int{
@@ -36,6 +37,7 @@ var precedences = map[token.TokenType]int{
 	token.SHOVL:     SPECIAL,
 	token.SHOVR:     SPECIAL,
 	token.LPAREN:    CALL,
+	token.LBRACKET:  INDEX,
 }
 
 // Error
@@ -87,6 +89,7 @@ func New(l *lexer.Lexer) *Parser {
 		p.registerInfix(k, p.parseInfixExpression)
 	}
 	p.registerInfix(token.LPAREN, p.parseCallExpression)
+	p.registerInfix(token.LBRACKET, p.parseIndexExpression)
 
 	// Set both tokens
 	p.nextToken()
@@ -215,7 +218,7 @@ func (p *Parser) parseExpression(precedence int) (ast.Expression, error) {
 	prefix := p.prefixParseFns[p.curToken.Type]
 
 	if prefix == nil {
-		return nil, createParseError("No prefix expression found for %q.", p.curToken.Type)
+		return nil, createParseError("No prefix expression found for %q (%q).", p.curToken.Type, p.curToken.Literal)
 	}
 
 	lhs, err := prefix()
@@ -499,6 +502,23 @@ func (p *Parser) parseExpressionList(end token.TokenType) ([]ast.Expression, err
 		return []ast.Expression{}, err
 	}
 	return list, nil
+}
+
+func (p *Parser) parseIndexExpression(left ast.Expression) (ast.Expression, error) {
+	exp := &ast.IndexExpression{Token: p.curToken, Left: left}
+
+	p.nextToken()
+	if i, err := p.parseExpression(LOWEST); err == nil {
+		exp.Index = i
+	} else {
+		return nil, err
+	}
+
+	if ok, err := p.expect(token.RBRACKET); !ok {
+		return nil, err
+	}
+
+	return exp, nil
 }
 
 // Utilities

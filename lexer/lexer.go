@@ -111,7 +111,7 @@ func (l *Lexer) NextToken() token.Token {
 			tok = token.New(token.RBRACKET, string(l.ch))
 			l.readChar()
 		default:
-			tok = token.New(token.ILLEGAL, "")
+			tok = token.New(token.ILLEGAL, string(l.ch))
 		}
 	}
 
@@ -144,7 +144,7 @@ func (l *Lexer) handleIdentifier() (token.TokenType, string) {
 }
 
 func isLetter(r rune) bool {
-	return 'a' <= r && r <= 'z' || r == '_' || r == '?' || r == '!'
+	return 'a' <= r && r <= 'z' || r == '_' || r == '?' || r == '!' || 'A' <= r && r <= 'Z'
 }
 
 func isDigit(ch rune) bool {
