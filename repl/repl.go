@@ -4,18 +4,16 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"monkey/evaluator"
+	"monkey/compiler"
 	"monkey/lexer"
-	"monkey/object"
 	"monkey/parser"
-	"strings"
+	"monkey/vm"
 )
 
 const PROMPT = "==> "
 
 func Start(in io.Reader, out io.Writer) {
 	scanner := bufio.NewScanner(in)
-	env := object.NewEnvironemnt()
 
 	for {
 		fmt.Fprint(out, PROMPT)
@@ -25,24 +23,30 @@ func Start(in io.Reader, out io.Writer) {
 		}
 
 		line := scanner.Text()
-		switch strings.Trim(line, " ") {
-		case "quit":
-			return
-		default:
-			l := lexer.New(line)
-			p := parser.New(l)
+		l := lexer.New(line)
+		p := parser.New(l)
 
-			if res, err := p.ParseProgram(); err == nil {
-				t := &evaluator.TreeWalker{}
-				if eval, err := t.Eval(res, env); err == nil {
-					io.WriteString(out, eval.Inspect())
-				} else {
-					io.WriteString(out, err.Error())
-				}
-			} else {
-				io.WriteString(out, err.Error())
-			}
-			io.WriteString(out, "\n")
+		program, err := p.ParseProgram()
+		if err != nil {
+			fmt.Fprintf(out, "Whoops: Parser error: %s\n", err.Error())
 		}
+
+		comp := compiler.New()
+		err = comp.Compile(program)
+		if err != nil {
+			fmt.Fprintf(out, "Woops! Compilation failed:\n %s\n", err)
+			continue
+		}
+
+		machine := vm.New(comp.Bytecode())
+		err = machine.Run()
+		if err != nil {
+			fmt.Fprintf(out, "Woops! Executing bytecode failed:\n %s\n", err)
+			continue
+		}
+
+		stackTop := machine.StackTop()
+		io.WriteString(out, stackTop.Inspect())
+		io.WriteString(out, "\n")
 	}
 }
