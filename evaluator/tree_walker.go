@@ -367,6 +367,8 @@ func (t *TreeWalker) evalIndexExpression(left, index object.Object) (object.Obje
 	switch {
 	case left.Type() == object.ARRAY_OBJ && index.Type() == object.INTEGER_OBJ:
 		return t.evalArrayIndexExpression(left, index)
+	case left.Type() == object.HASH_OBJ:
+		return t.evalHashIndex(left, index)
 	default:
 		return object.ErrorPair(createEvalError("Cannot index array with type %s", left.Type()))
 	}
@@ -407,4 +409,20 @@ func (t *TreeWalker) evalHashLiteral(node *ast.HashLiteral, env *object.Environm
 	}
 
 	return &object.Hash{Pairs: pairs}, nil
+}
+
+func (t *TreeWalker) evalHashIndex(hash, index object.Object) (object.Object, error) {
+	hashObject := hash.(*object.Hash)
+
+	key, ok := index.(object.Hashable)
+	if !ok {
+		return object.ErrorPair(createEvalError("unusable as hash key: %s", key))
+	}
+
+	pair, ok := hashObject.Pairs[key.HashKey()]
+	if !ok {
+		return object.NULL, nil
+	}
+
+	return pair.Value, nil
 }
