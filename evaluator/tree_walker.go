@@ -98,6 +98,8 @@ func (t *TreeWalker) Eval(node ast.Node, env *object.Environment) (object.Object
 			return index, err
 		}
 		return t.evalIndexExpression(left, index)
+	case *ast.HashLiteral:
+		return t.evalHashLiteral(node, env)
 	// Else
 	default:
 		return object.NULL, createEvalError("Unimplemented.")
@@ -379,4 +381,30 @@ func (t *TreeWalker) evalArrayIndexExpression(array, index object.Object) (objec
 		return object.ErrorPair(createEvalError("index out of bounds"))
 	}
 	return arrayObject.Elements[idx], nil
+}
+
+func (t *TreeWalker) evalHashLiteral(node *ast.HashLiteral, env *object.Environment) (object.Object, error) {
+	pairs := make(map[object.HashKey]object.HashPair)
+
+	for keyNode, valueNode := range node.Pairs {
+		key, err := t.Eval(keyNode, env)
+		if err != nil {
+			return key, err
+		}
+
+		hashKey, ok := key.(object.Hashable)
+		if !ok {
+			return object.ErrorPair(createEvalError("unusable as hash key: %s", key.Type()))
+		}
+
+		value, err := t.Eval(valueNode, env)
+		if err != nil {
+			return value, err
+		}
+
+		hashed := hashKey.HashKey()
+		pairs[hashed] = object.HashPair{Key: key, Value: value}
+	}
+
+	return &object.Hash{Pairs: pairs}, nil
 }

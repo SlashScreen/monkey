@@ -24,6 +24,9 @@ var singleCharMatch = map[rune]token.TokenType{
 	'%': token.PERCENT,
 	'<': token.LANG,
 	'>': token.RANG,
+	'[': token.LBRACKET,
+	']': token.RBRACKET,
+	':': token.COLON,
 }
 
 var doubleCharMatch = map[string]token.TokenType{
@@ -103,12 +106,6 @@ func (l *Lexer) NextToken() token.Token {
 		switch l.ch {
 		case '"':
 			tok = token.New(token.STRING, l.readString())
-			l.readChar()
-		case '[':
-			tok = token.New(token.LBRACKET, string(l.ch))
-			l.readChar()
-		case ']':
-			tok = token.New(token.RBRACKET, string(l.ch))
 			l.readChar()
 		default:
 			tok = token.New(token.ILLEGAL, string(l.ch))

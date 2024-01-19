@@ -29,6 +29,7 @@ func TestNextToken(t *testing.T) {
 	"foobar"
 	"foo bar"
 	[1, 2];
+	{"foo": "bar"}
 	`
 
 	tests := []struct {
@@ -116,6 +117,11 @@ func TestNextToken(t *testing.T) {
 		{token.INT, "2"},
 		{token.RBRACKET, "]"},
 		{token.SEMICOLON, ";"},
+		{token.LBRACE, "{"},
+		{token.STRING, "foo"},
+		{token.COLON, ":"},
+		{token.STRING, "bar"},
+		{token.RBRACE, "}"},
 		{token.EOF, ""},
 	}
 
@@ -125,7 +131,7 @@ func TestNextToken(t *testing.T) {
 		tok := l.NextToken()
 
 		if tok.Type != tt.expectedType {
-			t.Fatalf("tests[%d] - token type wrong. expected %q, got %q with literal %q", i, tt.expectedType, tok.Type, tok.Literal)
+			t.Fatalf("tests[%d] - token type wrong. expected %q (%q), got %q with literal %q", i, tt.expectedType, tt.expectedLiteral, tok.Type, tok.Literal)
 		}
 
 		if tok.Literal != tt.expectedLiteral {
