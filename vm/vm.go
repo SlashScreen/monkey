@@ -64,6 +64,10 @@ func (vm *VM) Run() error {
 			if err := vm.push(False); err != nil {
 				return err
 			}
+		case code.OpEqual, code.OpNotEqual, code.OpGreaterThan:
+			if err := vm.executeComparison(op); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -110,6 +114,40 @@ func (vm *VM) executeBinaryIntegerOp(op code.Opcode, l, r object.Object) error {
 	return vm.push(&object.Integer{Value: result})
 }
 
+func (vm *VM) executeComparison(op code.Opcode) error {
+	r := vm.pop()
+	l := vm.pop()
+
+	if l.Type() == object.INTEGER_OBJ && r.Type() == object.INTEGER_OBJ {
+		return vm.executeIntegerComparison(op, l, r)
+	}
+
+	switch op {
+	case code.OpEqual:
+		return vm.push(nativeBoolToBooleanObject(r == l))
+	case code.OpNotEqual:
+		return vm.push(nativeBoolToBooleanObject(r != l))
+	default:
+		return fmt.Errorf("unknown operator: %d (%s %s)", op, l.Type(), r.Type())
+	}
+}
+
+func (vm *VM) executeIntegerComparison(op code.Opcode, l, r object.Object) error {
+	lv := l.(*object.Integer).Value
+	rv := r.(*object.Integer).Value
+
+	switch op {
+	case code.OpEqual:
+		return vm.push(nativeBoolToBooleanObject(lv == rv))
+	case code.OpNotEqual:
+		return vm.push(nativeBoolToBooleanObject(lv != rv))
+	case code.OpGreaterThan:
+		return vm.push(nativeBoolToBooleanObject(lv > rv))
+	default:
+		return fmt.Errorf("unknown integer operator: %d", op)
+	}
+}
+
 func (vm *VM) push(o object.Object) error {
 	if vm.sp >= STACKSIZE {
 		return fmt.Errorf("stack overflow")
@@ -128,4 +166,11 @@ func (vm *VM) pop() object.Object {
 
 func (vm *VM) LastPoppedStackElem() object.Object {
 	return vm.stack[vm.sp]
+}
+
+func nativeBoolToBooleanObject(input bool) *object.Boolean {
+	if input {
+		return True
+	}
+	return False
 }
