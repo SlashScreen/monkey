@@ -68,6 +68,14 @@ func (vm *VM) Run() error {
 			if err := vm.executeComparison(op); err != nil {
 				return err
 			}
+		case code.OpBang:
+			if err := vm.executeBangOp(); err != nil {
+				return err
+			}
+		case code.OpMinus:
+			if err := vm.executeMinusOperator(); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -146,6 +154,30 @@ func (vm *VM) executeIntegerComparison(op code.Opcode, l, r object.Object) error
 	default:
 		return fmt.Errorf("unknown integer operator: %d", op)
 	}
+}
+
+func (vm *VM) executeBangOp() error {
+	operand := vm.pop()
+
+	switch operand {
+	case True:
+		return vm.push(False)
+	case False:
+		return vm.push(True)
+	default:
+		return vm.push(False)
+	}
+}
+
+func (vm *VM) executeMinusOperator() error {
+	operand := vm.pop()
+
+	if operand.Type() != object.INTEGER_OBJ {
+		return fmt.Errorf("unsupported type for negation: %s", operand.Type())
+	}
+
+	value := operand.(*object.Integer).Value
+	return vm.push(&object.Integer{Value: -value})
 }
 
 func (vm *VM) push(o object.Object) error {

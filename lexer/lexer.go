@@ -27,6 +27,7 @@ var singleCharMatch = map[rune]token.TokenType{
 	'[': token.LBRACKET,
 	']': token.RBRACKET,
 	':': token.COLON,
+	'!': token.BANG,
 }
 
 var doubleCharMatch = map[string]token.TokenType{
@@ -95,13 +96,13 @@ func (l *Lexer) NextToken() token.Token {
 		tok = token.New(val, string(l.ch)+string(l.peekChar()))
 		l.readChar()
 		l.readChar()
+	} else if val, ok := singleCharMatch[l.ch]; ok {
+		tok = token.New(val, string(l.ch))
+		l.readChar()
 	} else if isLetter(l.ch) {
 		tok = token.New(l.handleIdentifier())
 	} else if isDigit(l.ch) {
 		tok = token.New(token.INT, l.readNumber())
-	} else if val, ok := singleCharMatch[l.ch]; ok {
-		tok = token.New(val, string(l.ch))
-		l.readChar()
 	} else {
 		switch l.ch {
 		case '"':
