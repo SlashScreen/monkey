@@ -9,8 +9,11 @@ import (
 
 const STACKSIZE = 2048
 
-var True = &object.Boolean{Value: true}
-var False = &object.Boolean{Value: false}
+var (
+	True  = &object.Boolean{Value: true}
+	False = &object.Boolean{Value: false}
+	Null  = &object.Null{}
+)
 
 type VM struct {
 	constants    []object.Object
@@ -86,6 +89,10 @@ func (vm *VM) Run() error {
 			condition := vm.pop()
 			if !isTruthy(condition) {
 				ip = pos - 1
+			}
+		case code.OpNull:
+			if err := vm.push(Null); err != nil {
+				return err
 			}
 		}
 	}
@@ -175,6 +182,8 @@ func (vm *VM) executeBangOp() error {
 		return vm.push(False)
 	case False:
 		return vm.push(True)
+	case Null:
+		return vm.push(True)
 	default:
 		return vm.push(False)
 	}
@@ -220,10 +229,10 @@ func nativeBoolToBooleanObject(input bool) *object.Boolean {
 
 func isTruthy(obj object.Object) bool {
 	switch obj := obj.(type) {
-
 	case *object.Boolean:
 		return obj.Value
-
+	case *object.Null:
+		return false
 	default:
 		return true
 	}
