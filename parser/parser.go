@@ -186,8 +186,6 @@ func (p *Parser) parseExpressionStatement() (*ast.ExpressionStatement, error) {
 		return nil, err
 	}
 
-	p.nextToken()
-
 	if p.peekTokenIs(token.SEMICOLON) {
 		p.nextToken()
 	}

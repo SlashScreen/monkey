@@ -110,6 +110,8 @@ func ReadUint16(ins Instructions) uint16 {
 const (
 	OpConstant Opcode = iota
 	OpPop
+	OpJumpNotTruthy
+	OpJump
 
 	OpTrue
 	OpFalse
@@ -129,8 +131,10 @@ const (
 )
 
 var definitions = map[Opcode]*Definition{
-	OpConstant: {"OpConstant", []int{2}},
-	OpPop:      {"OpPop", []int{}},
+	OpConstant:      {"OpConstant", []int{2}},
+	OpPop:           {"OpPop", []int{}},
+	OpJumpNotTruthy: {"OpJumpNotTruthy", []int{2}},
+	OpJump:          {"OpJump", []int{2}},
 
 	OpTrue:  {"OpTrue", []int{}},
 	OpFalse: {"OpFalse", []int{}},
