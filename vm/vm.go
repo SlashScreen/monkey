@@ -76,6 +76,17 @@ func (vm *VM) Run() error {
 			if err := vm.executeMinusOperator(); err != nil {
 				return err
 			}
+		case code.OpJump:
+			pos := int(code.ReadUint16(vm.instructions[ip+1:]))
+			ip = pos - 1
+		case code.OpJumpNotTruthy:
+			pos := int(code.ReadUint16(vm.instructions[ip+1:]))
+			ip += 2
+
+			condition := vm.pop()
+			if !isTruthy(condition) {
+				ip = pos - 1
+			}
 		}
 	}
 
@@ -205,4 +216,15 @@ func nativeBoolToBooleanObject(input bool) *object.Boolean {
 		return True
 	}
 	return False
+}
+
+func isTruthy(obj object.Object) bool {
+	switch obj := obj.(type) {
+
+	case *object.Boolean:
+		return obj.Value
+
+	default:
+		return true
+	}
 }
