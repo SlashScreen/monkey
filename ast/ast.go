@@ -40,6 +40,7 @@ func (p *Program) String() string {
 
 	for _, s := range p.Statements {
 		out.WriteString(s.String())
+		out.WriteString("\n")
 	}
 
 	return out.String()
@@ -197,6 +198,7 @@ func (bs *BlockStatement) String() string {
 
 	for _, s := range bs.Statements {
 		out.WriteString(s.String())
+		out.WriteString("\n")
 	}
 
 	return out.String()
@@ -250,8 +252,9 @@ func (fl *FunctionLiteral) String() string {
 	out.WriteString(fl.TokenLiteral())
 	out.WriteString("(")
 	out.WriteString(strings.Join(params, ", "))
-	out.WriteString(") ")
+	out.WriteString(") {")
 	out.WriteString(fl.Body.String())
+	out.WriteString("}")
 
 	return out.String()
 }

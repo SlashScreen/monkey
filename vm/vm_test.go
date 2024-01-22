@@ -40,19 +40,24 @@ type vmTestCase struct {
 func runVmTests(t *testing.T, tests []vmTestCase) {
 	t.Helper()
 
-	for _, tt := range tests {
+	for i, tt := range tests {
 		program := parse(tt.input)
 
 		comp := compiler.New()
 		err := comp.Compile(program)
 		if err != nil {
-			t.Fatalf("compiler error: %s", err)
+			t.Fatalf("compiler error on test %d: %s", i, err)
 		}
 
 		vm := New(comp.Bytecode())
 		err = vm.Run()
 		if err != nil {
-			t.Fatalf("vm error: %s", err)
+			cstr := ""
+			for _, constant := range vm.constants {
+				cstr += constant.Inspect() + ", "
+			}
+
+			t.Fatalf("vm error on test %d: %s. \n program dump: %s \n bytecode dump:\n%s\n Constants: \n%s", i, err, program.String(), comp.Bytecode().Instructions.String(), cstr)
 		}
 
 		stackElem := vm.LastPoppedStackElem()
@@ -316,6 +321,119 @@ func TestCallingFunctionsWithoutArguments(t *testing.T) {
         fivePlusTen();
         `,
 			expected: 15,
+		},
+		{
+			input: `
+        let one = fn() { 1; };
+        let two = fn() { 2; };
+        one() + two()
+        `,
+			expected: 3,
+		},
+		{
+			input: `
+        let a = fn() { 1 };
+        let b = fn() { a() + 1 };
+        let c = fn() { b() + 1 };
+        c();
+        `,
+			expected: 3,
+		},
+	}
+
+	runVmTests(t, tests)
+}
+
+func TestFunctionsWithReturnStatement(t *testing.T) {
+	tests := []vmTestCase{
+		{
+			input: `
+        let earlyExit = fn() { return 99; 100; };
+        earlyExit();
+        `,
+			expected: 99,
+		},
+		{
+			input: `
+        let earlyExit = fn() { return 99; return 100; };
+        earlyExit();
+        `,
+			expected: 99,
+		},
+	}
+
+	runVmTests(t, tests)
+}
+
+func TestFunctionsWithoutReturnValue(t *testing.T) {
+	tests := []vmTestCase{
+		{
+			input: `
+        let noReturn = fn() { };
+        noReturn();
+        `,
+			expected: Null,
+		},
+		{
+			input: `
+        let noReturn = fn() { };
+        let noReturnTwo = fn() { noReturn(); };
+        noReturn();
+        noReturnTwo();
+        `,
+			expected: Null,
+		},
+	}
+
+	runVmTests(t, tests)
+}
+
+func TestCallingFunctionsWithBindings(t *testing.T) {
+	tests := []vmTestCase{
+		{
+			input: `
+        let one = fn() { let one = 1; one };
+        one();
+        `,
+			expected: 1,
+		},
+		{
+			input: `
+        let oneAndTwo = fn() { let one = 1; let two = 2; one + two; };
+        oneAndTwo();
+        `,
+			expected: 3,
+		},
+		{
+			input: `
+        let oneAndTwo = fn() { let one = 1; let two = 2; one + two; };
+        let threeAndFour = fn() { let three = 3; let four = 4; three + four; };
+        oneAndTwo() + threeAndFour();
+        `,
+			expected: 10,
+		},
+		{
+			input: `
+        let firstFoobar = fn() { let foobar = 50; foobar; };
+        let secondFoobar = fn() { let foobar = 100; foobar; };
+        firstFoobar() + secondFoobar();
+        `,
+			expected: 150,
+		},
+		{
+			input: `
+        let globalSeed = 50;
+        let minusOne = fn() {
+            let num = 1;
+            globalSeed - num;
+        }
+        let minusTwo = fn() {
+            let num = 2;
+            globalSeed - num;
+        }
+        minusOne() + minusTwo();
+        `,
+			expected: 97,
 		},
 	}
 
