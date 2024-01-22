@@ -134,6 +134,7 @@ const (
 
 	OpGetGlobal
 	OpSetGlobal
+	OpIndex
 )
 
 var definitions = map[Opcode]*Definition{
@@ -163,4 +164,5 @@ var definitions = map[Opcode]*Definition{
 
 	OpGetGlobal: {"OpGetGlobal", []int{2}},
 	OpSetGlobal: {"OpSetGlobal", []int{2}},
+	OpIndex:     {"OpIndex", []int{}},
 }
