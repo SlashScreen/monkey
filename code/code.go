@@ -129,6 +129,9 @@ const (
 	OpMul
 	OpDiv
 	OpMod
+
+	OpGetGlobal
+	OpSetGlobal
 )
 
 var definitions = map[Opcode]*Definition{
@@ -153,4 +156,7 @@ var definitions = map[Opcode]*Definition{
 	OpMul: {"OpMul", []int{}},
 	OpDiv: {"OpDiv", []int{}},
 	OpMod: {"OpMod", []int{}},
+
+	OpGetGlobal: {"OpGetGlobal", []int{2}},
+	OpSetGlobal: {"OpSetGlobal", []int{2}},
 }
