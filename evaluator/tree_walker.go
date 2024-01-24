@@ -321,7 +321,10 @@ func (t *TreeWalker) applyFunction(fn object.Object, args []object.Object) (obje
 
 		return t.unwrapReturnValue(evaluated), nil
 	case *object.Builtin:
-		return fn.Fn(args...), nil
+		if result := fn.Fn(args...); result != nil {
+			return result, nil
+		}
+		return object.NULL, nil
 	default:
 		return object.ErrorPair(createEvalError("not a function: %s", fn.Type()))
 	}
