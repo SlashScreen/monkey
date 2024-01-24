@@ -152,6 +152,8 @@ const (
 	OpGetLocal
 	OpSetLocal
 	OpGetBuiltin
+	OpGetFree
+	OpCurrentClosure
 	OpIndex
 )
 
@@ -184,10 +186,12 @@ var definitions = map[Opcode]*Definition{
 	OpDiv: {"OpDiv", []int{}},
 	OpMod: {"OpMod", []int{}},
 
-	OpGetGlobal:  {"OpGetGlobal", []int{2}},
-	OpSetGlobal:  {"OpSetGlobal", []int{2}},
-	OpGetLocal:   {"OpGetLocal", []int{1}},
-	OpSetLocal:   {"OpSetLocal", []int{1}},
-	OpGetBuiltin: {"OpGetBuiltin", []int{1}},
-	OpIndex:      {"OpIndex", []int{}},
+	OpGetGlobal:      {"OpGetGlobal", []int{2}},
+	OpSetGlobal:      {"OpSetGlobal", []int{2}},
+	OpGetLocal:       {"OpGetLocal", []int{1}},
+	OpSetLocal:       {"OpSetLocal", []int{1}},
+	OpGetBuiltin:     {"OpGetBuiltin", []int{1}},
+	OpGetFree:        {"OpGetFree", []int{1}},
+	OpCurrentClosure: {"OpCurrentClosure", []int{}},
+	OpIndex:          {"OpIndex", []int{}},
 }

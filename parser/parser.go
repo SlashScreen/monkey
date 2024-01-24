@@ -154,6 +154,10 @@ func (p *Parser) parseLetStatement() (*ast.LetStatement, error) {
 		return nil, err
 	}
 
+	if fl, ok := stmt.Value.(*ast.FunctionLiteral); ok {
+		fl.Name = stmt.Name.Value
+	}
+
 	if p.peekTokenIs(token.SEMICOLON) { // FIXME: This
 		p.nextToken()
 	}

@@ -178,10 +178,10 @@ func (c *Compiler) Compile(node ast.Node) error {
 			}
 		}
 	case *ast.LetStatement:
+		symbol := c.symbolTable.Define(node.Name.Value) // up here to allow body to reference name
 		if err := c.Compile(node.Value); err != nil {
 			return err
 		}
-		symbol := c.symbolTable.Define(node.Name.Value)
 		if symbol.Scope == GLOBALSCOPE {
 			c.emit(code.OpSetGlobal, symbol.Index)
 		} else {
@@ -239,6 +239,10 @@ func (c *Compiler) Compile(node ast.Node) error {
 	case *ast.FunctionLiteral:
 		c.enterScope()
 
+		if node.Name != "" {
+			c.symbolTable.DefineFunctionName(node.Name)
+		}
+
 		for _, p := range node.Parameters {
 			c.symbolTable.Define(p.Value)
 		}
@@ -255,11 +259,16 @@ func (c *Compiler) Compile(node ast.Node) error {
 			c.emit(code.OpReturn)
 		}
 
+		freeSymbols := c.symbolTable.FreeSymbols
 		numLocals := c.symbolTable.numDefinitions
 		instructions := c.leaveScope()
 
+		for _, s := range freeSymbols {
+			c.loadSymbol(s)
+		}
+
 		compiledFn := &object.CompiledFunction{Instructions: instructions, NumLocals: numLocals, NumParameters: len(node.Parameters)}
-		c.emit(code.OpClosure, c.addConstant(compiledFn), 0)
+		c.emit(code.OpClosure, c.addConstant(compiledFn), len(freeSymbols))
 	case *ast.ReturnStatement:
 		if err := c.Compile(node.ReturnValue); err != nil {
 			return err
@@ -402,6 +411,11 @@ func (c *Compiler) loadSymbol(s Symbol) {
 		op = code.OpGetLocal
 	case BUILTINSCOPE:
 		op = code.OpGetBuiltin
+	case FREESCOPE:
+		op = code.OpGetFree
+	case FUNCTIONSCOPE:
+		c.emit(code.OpCurrentClosure)
+		return
 	}
 
 	c.emit(op, s.Index)
