@@ -48,6 +48,8 @@ func (ins Instructions) fmtInstruction(def *Definition, operands []int) string {
 		return def.Name
 	case 1:
 		return fmt.Sprintf("%s %d", def.Name, operands[0])
+	case 2:
+		return fmt.Sprintf("%s %d %d", def.Name, operands[0], operands[1])
 	}
 
 	return fmt.Sprintf("ERROR: unhandled operandCount for %s\n", def.Name)
@@ -84,6 +86,7 @@ func Make(op Opcode, operands ...int) []byte {
 		case 1:
 			instruction[offset] = byte(o)
 		}
+		offset += width
 	}
 
 	return instruction
@@ -129,6 +132,7 @@ const (
 	OpNull
 	OpArray
 	OpHash
+	OpClosure
 
 	OpEqual
 	OpNotEqual
@@ -159,6 +163,7 @@ var definitions = map[Opcode]*Definition{
 	OpCall:          {"OpCall", []int{1}},
 	OpReturn:        {"OpReturn", []int{}},
 	OpReturnValue:   {"OpReturnValue", []int{}},
+	OpClosure:       {"OpClosure", []int{2, 1}},
 
 	OpTrue:  {"OpTrue", []int{}},
 	OpFalse: {"OpFalse", []int{}},

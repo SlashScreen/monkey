@@ -259,7 +259,7 @@ func (c *Compiler) Compile(node ast.Node) error {
 		instructions := c.leaveScope()
 
 		compiledFn := &object.CompiledFunction{Instructions: instructions, NumLocals: numLocals, NumParameters: len(node.Parameters)}
-		c.emit(code.OpConstant, c.addConstant(compiledFn))
+		c.emit(code.OpClosure, c.addConstant(compiledFn), 0)
 	case *ast.ReturnStatement:
 		if err := c.Compile(node.ReturnValue); err != nil {
 			return err
