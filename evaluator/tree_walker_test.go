@@ -36,7 +36,7 @@ func testEval(input string) (object.Object, error) {
 	}
 
 	t := &TreeWalker{}
-	env := object.NewEnvironemnt()
+	env := object.NewEnvironment()
 
 	return t.Eval(program, env)
 }
