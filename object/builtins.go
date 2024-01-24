@@ -10,7 +10,7 @@ var Builtins = []struct {
 		"len", &Builtin{
 			Fn: func(args ...Object) Object {
 				if len(args) != 1 {
-					return &Error{Message: newError("wrong number of arguments to 'len': %d", len(args))}
+					return &Error{Message: newError("wrong number of arguments. got=%d, want=1", len(args))}
 				}
 				switch arg := args[0].(type) {
 				case *String:
@@ -18,7 +18,7 @@ var Builtins = []struct {
 				case *Array:
 					return &Integer{Value: int64(len(arg.Elements))}
 				default:
-					return &Error{Message: newError("cannot take the length of %s", args[0].Type())}
+					return &Error{Message: newError("argument to `len` not supported, got %s", args[0].Type())}
 				}
 			},
 		},
@@ -97,6 +97,29 @@ var Builtins = []struct {
 			}
 
 			return nil
+		},
+		},
+	},
+	{
+		"push",
+		&Builtin{Fn: func(args ...Object) Object {
+			if len(args) != 2 {
+				return &Error{Message: newError("wrong number of arguments. got=%d, want=2",
+					len(args))}
+			}
+			if args[0].Type() != ARRAY_OBJ {
+				return &Error{Message: newError("argument to `push` must be ARRAY, got %s",
+					args[0].Type())}
+			}
+
+			arr := args[0].(*Array)
+			length := len(arr.Elements)
+
+			newElements := make([]Object, length+1)
+			copy(newElements, arr.Elements)
+			newElements[length] = args[1]
+
+			return &Array{Elements: newElements}
 		},
 		},
 	},

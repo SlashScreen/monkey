@@ -41,6 +41,11 @@ func New() *Compiler {
 		previousInstruction: EmittedInstruction{},
 	}
 
+	symbolTable := NewSymbolTable()
+	for i, v := range object.Builtins {
+		symbolTable.DefineBuiltin(i, v.Name)
+	}
+
 	return &Compiler{
 		instructions: code.Instructions{},
 		constants:    []object.Object{},
@@ -48,7 +53,7 @@ func New() *Compiler {
 		scopes:     []CompilationScope{mainScope},
 		scopeIndex: 0,
 
-		symbolTable: NewSymbolTable(),
+		symbolTable: symbolTable,
 	}
 }
 
@@ -188,11 +193,7 @@ func (c *Compiler) Compile(node ast.Node) error {
 			return fmt.Errorf("undefined variable %s", node.Value)
 		}
 
-		if symbol.Scope == GLOBALSCOPE {
-			c.emit(code.OpGetGlobal, symbol.Index)
-		} else {
-			c.emit(code.OpGetLocal, symbol.Index)
-		}
+		c.loadSymbol(symbol)
 	case *ast.StringLiteral:
 		str := &object.String{Value: node.Value}
 		c.emit(code.OpConstant, c.addConstant(str))
@@ -389,4 +390,19 @@ func (c *Compiler) replaceLastPopWithReturn() {
 	c.replaceInstruction(lastPos, code.Make(code.OpReturnValue))
 
 	c.scopes[c.scopeIndex].lastInstruction.Opcode = code.OpReturnValue
+}
+
+func (c *Compiler) loadSymbol(s Symbol) {
+	var op code.Opcode
+
+	switch s.Scope {
+	case GLOBALSCOPE:
+		op = code.OpGetGlobal
+	case LOCALSCOPE:
+		op = code.OpGetLocal
+	case BUILTINSCOPE:
+		op = code.OpGetBuiltin
+	}
+
+	c.emit(op, s.Index)
 }
